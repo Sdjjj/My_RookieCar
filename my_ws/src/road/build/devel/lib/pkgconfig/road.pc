@@ -1,0 +1,8 @@
+prefix=/home/shidejun/my_ws/src/road/build/devel
+
+Name: road
+Description: Description of road
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 
