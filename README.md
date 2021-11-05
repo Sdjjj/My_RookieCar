@@ -3,20 +3,26 @@
 
 仿真步骤：
 
-1、编译ROS工作空间：
+1、使用前请安装Gazebo关节控制相关依赖
+
+      sudo apt-get install -y ros-kinetic-gazebo-ros-control
+      sudo apt-get install -y ros-kinetic-ros-control ros-kinetic-ros-controllers
+      sudo apt-get install -y ros-kinetic-gazebo-ros-control
+
+2、编译ROS工作空间：
 
 在/src所在目录下，终端输入：
    
         catkin_make
 
-2、启动Gazebo下的空白世界并加载小车模型
+3、启动Gazebo下的空白世界并加载小车模型
 
 新建终端，输入以下命令： 
 
         source /devel/setup.sh                 
         roslaunch car_model spawn_car.launch
         
-3、启动rviz
+4、启动rviz
 
 rviz显示的配置文件为 myLQR.rviz ，请在Rviz里添加该配置文件
 
@@ -25,7 +31,7 @@ rviz显示的配置文件为 myLQR.rviz ，请在Rviz里添加该配置文件
         source /devel/setup.sh
         rivz      
         
-4、启动LQR算法
+5、启动LQR算法
 
 新建终端，输入以下命令：
 
