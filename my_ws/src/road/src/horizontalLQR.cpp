@@ -1,5 +1,5 @@
-#include "quintcPolynomial.h"
-#include "quinticType.h"
+#include "/home/shidejun/my_ws/src/road/include/quintcPolynomial.h"
+#include "/home/shidejun/my_ws/src/road/include/quinticType.h"
 #include <iostream>
 #include <cmath>
 #include <ros/ros.h>
@@ -36,11 +36,10 @@ double wheel_max_degree = 0.6;
 //采样时间
 #define dt 0.1
 
-// t-t0经历的时间
-double T = 50;
-
-double xend = 50.0;
-double yend = 10.0;
+// 五次多项式时间和终点参数
+#define time 50
+#define xend 50
+#define yend 10
 
 
 
@@ -64,56 +63,55 @@ nav_msgs::Path car_trajectory_msgs; //用于发布小车运动轨迹存储信息
 
 
 /***********   五次多项式：计算x和y方向上的距离，速度，加速度      *******************/
-quinticType pathpoint;  //由于只计算一次路径规划，故设为全局变量
+quinticType path_temp;  //由于只计算一次路径规划，故设为全局变量
 void cal_path_number()
 {   
-    //quinticType path_temp; //需要多次计算路径规划时，设为局部变量
-
     QuinticPolynomial QPx;
-    QPx.cal_coefficient_x(0.0, 0.0, 0.0, xend,
-                           0.0, 0.0, T);
     //给出x方向上的初始和目标点横向状态参数：x0, vx0, ax0, x1,vx1, ax1
-    //QPx.cal_coefficient_x(0, 0, 0, 10, 0, 0, time);
+    QPx.cal_coefficient_x(0, 1, 0, xend, 1, 0, time);
 
     QuinticPolynomial QPy;
     //给出y方向上的初始和目标点横向状态参数：y0, vy0, ay0, y1,vy1, ay1
-    QPy.cal_coefficient_y(0.0, 0.0, 0.0, yend,
-                           0.0, 0.0, T, xend);
+    QPy.cal_coefficient_y(0, 0, 0, yend, 0, 0, time);
 
-    for(double t = 0; t < T; t += dt)
+    QuinticPolynomial cal_theta_main;
+
+    QuinticPolynomial cal_curvature;
+    
+    //将时间t离散化，求出离散化后每个时间点对应的距离，速度，加速度
+    for (double i = 0; i < time; i += dt)
     {
-        double x = QPx.calc_point_x(t);
-        double xd = QPx.calc_point_xd(t);
-        double xdd = QPx.calc_point_xdd(t);
+        path_temp.x.push_back(QPx.direction_x_distance(i));
+        path_temp.vx.push_back(QPx.direction_x_velocity(i));
+        path_temp.ax.push_back(QPx.direction_x_acceleration(i));
 
-        pathpoint.x.push_back(x);
-        pathpoint.vx.push_back(xd);
-        pathpoint.ax.push_back(xdd);
-
-        double y_x_t = QPy.calc_point_y_x(x);
-        double y_x_d = QPy.calc_point_y_x_d(x);
-        double y_x_t_d = QPy.calc_point_y_t_d(y_x_d, xd);
-
-        double y_x_dd = QPy.calc_point_y_x_dd(x);
-        double y_x_t_dd = QPy.calc_point_y_t_dd(y_x_dd, xd, y_x_d, xdd);
-
-        pathpoint.y.push_back(y_x_t);
-        pathpoint.vy.push_back(y_x_t_d);
-        pathpoint.ay.push_back(y_x_t_dd);
-
-        // 压入曲率
-        pathpoint.kappar.push_back(QPy.calc_point_k(y_x_dd, y_x_d));
-
+        path_temp.y.push_back(QPy.direction_y_distance(i));
+        path_temp.vy.push_back(QPy.direction_y_velocity(i));
+        path_temp.ay.push_back(QPy.direction_y_acceleration(i));
     }
 
-    int num = pathpoint.x.size();  
-    for (int i = 0; i < num; i++) 
+    /*************    计算角度theta        ******************************/
+    int size = path_temp.x.size();
+
+    for (size_t i = 0; i < size; i++)
     {
-    double dy = pathpoint.y[i + 1] - pathpoint.y[i];
-    double dx = pathpoint.x[i + 1] - pathpoint.x[i];
-    pathpoint.thetar.push_back(QPy.calc_point_thetar(dy, dx));
+        double input1 = path_temp.vx.at(i);
+        double input2 = path_temp.vy.at(i);
+        double theta_temp = cal_theta_main.cal_thetar(input1, input2);
+        path_temp.thetar.push_back(theta_temp);
     }
 
+    /*************    计算曲率k        ******************************/
+    for (size_t i = 0; i < size; i++)
+    {
+        double input1 = path_temp.vx.at(i);
+        double input2 = path_temp.ax.at(i);
+        double input3 = path_temp.vy.at(i);
+        double input4 = path_temp.ay.at(i);
+
+        double curvature_temp = cal_curvature.cal_kappar(input1, input2, input3, input4);
+        path_temp.kappar.push_back(curvature_temp);
+    }    
 }
 
 /************        LQR 计算模块      ******************/
@@ -196,21 +194,21 @@ Eigen::VectorXd cal_err_kr(double x_now, double y_now, Eigen::Vector3d eular)
     double x_pre = x_now + vx * ts * cos(eular[2]) - vy * ts * sin(eular[2]);
     double y_pre = y_now + vy * ts * cos(eular[2]) + vx * ts * sin(eular[2]);
 
-    int length = pathpoint.x.size();
+    int length = path_temp.x.size();
 
     cout << "length= " << length << endl;
-    double temp1 =x_pre - pathpoint.x.at(0);
-    //double temp1 =x_now - pathpoint.x.at(0);
-    double temp2 =y_pre - pathpoint.y.at(0);
-    //double temp2 =y_now - pathpoint.y.at(0);
+    double temp1 =x_pre - path_temp.x.at(0);
+    //double temp1 =x_now - path_temp.x.at(0);
+    double temp2 =y_pre - path_temp.y.at(0);
+    //double temp2 =y_now - path_temp.y.at(0);
     double d_min = pow(temp1, 2) + pow(temp2, 2);
     int index = 0;
     for (size_t i = 0; i < length; i++)
     {
-        temp1 = x_pre - pathpoint.x.at(i);
-        //double temp3 = x_now - pathpoint.x.at(i);
-        temp2= y_pre - pathpoint.y.at(i);
-        //double temp4= y_now - pathpoint.y.at(i);
+        temp1 = x_pre - path_temp.x.at(i);
+        //double temp3 = x_now - path_temp.x.at(i);
+        temp2= y_pre - path_temp.y.at(i);
+        //double temp4= y_now - path_temp.y.at(i);
         double d_temp = pow(temp1, 2) + pow(temp2, 2);
 
         if (d_temp < d_min)
@@ -228,13 +226,13 @@ Eigen::VectorXd cal_err_kr(double x_now, double y_now, Eigen::Vector3d eular)
     Eigen::Vector2d nor;
     Eigen::Vector2d d_err;
 
-    tor << cos(pathpoint.thetar[index]) , sin(pathpoint.thetar[index]);
-    nor << -sin(pathpoint.thetar[index]), cos(pathpoint.thetar[index]);
-    d_err << x_pre - pathpoint.x[index], y_pre - pathpoint.y[index];
-    //d_err << x_now - pathpoint.x[index], y_now - pathpoint.y[index];
+    tor << cos(path_temp.thetar[index]) , sin(path_temp.thetar[index]);
+    nor << -sin(path_temp.thetar[index]), cos(path_temp.thetar[index]);
+    d_err << x_pre - path_temp.x[index], y_pre - path_temp.y[index];
+    //d_err << x_now - path_temp.x[index], y_now - path_temp.y[index];
      
     //计算 phi_dot   
-    double phi_dot = vx * pathpoint.kappar[index];
+    double phi_dot = vx * path_temp.kappar[index];
 
     //计算预瞄的 phi,预瞄的时间为ts
     double phi = eular[2] + phi_dot * ts;
@@ -247,7 +245,7 @@ Eigen::VectorXd cal_err_kr(double x_now, double y_now, Eigen::Vector3d eular)
     double es = tor.transpose() * d_err;
 
     //计算投影点处的thetar
-    double projection_point_thetar = pathpoint.thetar[index] + pathpoint.kappar[index] * es;
+    double projection_point_thetar = path_temp.thetar[index] + path_temp.kappar[index] * es;
 
     //计算ed的导数 ed_dot
      double ed_dot = vy * cos(phi - projection_point_thetar) + vx * sin(phi - projection_point_thetar);
@@ -258,13 +256,13 @@ Eigen::VectorXd cal_err_kr(double x_now, double y_now, Eigen::Vector3d eular)
 
     //计算s_dot
     double s_dot_fenzi = vx * cos(phi - projection_point_thetar) - vy * sin(phi - projection_point_thetar);
-    double s_dot = s_dot_fenzi / (1-pathpoint.kappar[index] * ed);
+    double s_dot = s_dot_fenzi / (1-path_temp.kappar[index] * ed);
 
     //计算 e_phi_dot
-    double e_phi_dot = phi_dot - pathpoint.kappar[index] * s_dot;
+    double e_phi_dot = phi_dot - path_temp.kappar[index] * s_dot;
 
     //计算 kr
-    double kr = pathpoint.kappar[index];
+    double kr = path_temp.kappar[index];
 
     Eigen::VectorXd err_kr(5, 1);
     err_kr[0] = ed;
@@ -402,11 +400,11 @@ int main(int argc, char **argv)
     pose_planning.header.frame_id = "world";
     pose_planning.header.stamp = ros::Time::now();
 
-    int len = pathpoint.x.size();
+    int len = path_temp.x.size();
     for (size_t i = 0; i < len; i++)
     {
-        pose_planning.pose.position.x = pathpoint.x[i];
-        pose_planning.pose.position.y = pathpoint.y[i];
+        pose_planning.pose.position.x = path_temp.x[i];
+        pose_planning.pose.position.y = path_temp.y[i];
         pose_planning.pose.position.z = 0.0;
 
         pose_planning.pose.orientation.x = 0.0;

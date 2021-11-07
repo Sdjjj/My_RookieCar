@@ -1,18 +1,22 @@
 #include <vector>
+#include <eigen3/Eigen/Dense>
 using namespace std;
 
 class quinticType
 {
 public:
-    vector<double> x;
-    vector<double> vx;
-    vector<double> ax;
+    vector<float> x;
+    vector<float> vx;
+    vector<float> ax;
 
-    vector<double> y;
-    vector<double> vy;
-    vector<double> ay;
+    vector<float> y;
+    vector<float> vy;
+    vector<float> ay;
 
-    vector<double> thetar;
-    vector<double> kappar;
+    vector<float> thetar;
+    vector<float> kappar;
+
+    Eigen::Vector2d tor;
+    Eigen::Vector2d nor;
 
 };
