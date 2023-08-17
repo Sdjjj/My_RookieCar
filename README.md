@@ -4,7 +4,6 @@
 仿真步骤：
 
 1、使用前请安装Gazebo关节控制相关依赖
-
       sudo apt-get install -y ros-kinetic-gazebo-ros-control
       sudo apt-get install -y ros-kinetic-ros-control ros-kinetic-ros-controllers
       sudo apt-get install -y ros-kinetic-gazebo-ros-control
@@ -35,8 +34,8 @@ rviz显示的配置文件为 myLQR.rviz ，请在Rviz里添加该配置文件
 
 新建终端，输入以下命令：
 
-        source /devel/setup.sh
-        rosrun road horizontalLQR
+'source /devel/setup.sh'
+'rosrun road horizontalLQR'
         
 调整Q和R以及预瞄时间值，可改变不同速度下的跟踪效果以及车辆摆振效果
 红色轨迹为生成的五次多项式轨迹，绿色轨迹为小车行驶轨迹
