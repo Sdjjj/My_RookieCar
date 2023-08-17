@@ -4,9 +4,11 @@
 仿真步骤：
 
 1、使用前请安装Gazebo关节控制相关依赖
-      sudo apt-get install -y ros-kinetic-gazebo-ros-control
-      sudo apt-get install -y ros-kinetic-ros-control ros-kinetic-ros-controllers
-      sudo apt-get install -y ros-kinetic-gazebo-ros-control
+```
+sudo apt-get install -y ros-kinetic-gazebo-ros-control
+sudo apt-get install -y ros-kinetic-ros-control ros-kinetic-ros-controllers
+sudo apt-get install -y ros-kinetic-gazebo-ros-control
+```
 
 2、编译ROS工作空间：
 
